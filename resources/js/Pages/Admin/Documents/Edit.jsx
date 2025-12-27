@@ -110,11 +110,11 @@ export default function Edit({ document }) {
         return () => clearTimeout(saveTimeout.current);
     }, [chapters]);
 
-    console.log("DOCUMENT:", document);
-    console.log("CHAPTERS:", chapters);
-    chapters.forEach((ch, i) => {
-        console.log(`chapter[${i}].content =`, ch.content);
-    });
+    // console.log("DOCUMENT:", document);
+    // console.log("CHAPTERS:", chapters);
+    // chapters.forEach((ch, i) => {
+    //     console.log(`chapter[${i}].content =`, ch.content);
+    // });
     return (
         <AdminLayout>
             {/* Название документа */}
