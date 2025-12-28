@@ -41,5 +41,7 @@ Route::middleware('auth')->group(
 
         Route::post('/admin/documents/{document}/chapters', [ChapterController::class, 'store']);
         Route::put('/admin/chapters/{chapter}', [ChapterController::class, 'update']);
+
+        Route::get('/admin/documents/{document}/export-docx', [DocumentController::class, 'exportDocx']);
     }
 );

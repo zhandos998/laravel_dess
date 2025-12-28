@@ -6,6 +6,8 @@ import { useEffect, useRef } from "react";
 import AdminLayout from "@/Layouts/AdminLayout";
 import SlateEditor from "@/Components/SlateEditor";
 
+const MIN_LEVEL = 2;
+
 export default function Edit({ document }) {
     const [title, setTitle] = useState(document.title);
     // const [jsonCode, setJsonCode] = useState(
@@ -17,6 +19,56 @@ export default function Edit({ document }) {
             open: Boolean(c.open),
         }))
     );
+
+    const downloadDocumentJson = () => {
+        const data = {
+            document: {
+                id: document.id,
+                title: document.title,
+            },
+            chapters: chapters.map((ch) => ({
+                id: ch.id,
+                title: ch.title,
+                position: ch.position,
+                content: ch.content,
+            })),
+        };
+
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a");
+
+        a.href = url;
+        a.download = `document-${document.id}.json`;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    };
+
+    const downloadChapterJson = (chapter) => {
+        const data = {
+            chapter: {
+                id: chapter.id,
+                title: chapter.title,
+                position: chapter.position,
+            },
+            content: chapter.content,
+        };
+
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a"); // ✅ ИСПРАВЛЕНО
+
+        a.href = url;
+        a.download = `chapter-${chapter.position}.json`;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    };
 
     const toggleChapter = (id) => {
         setChapters((prev) =>
@@ -70,6 +122,7 @@ export default function Edit({ document }) {
             result.content = [
                 {
                     type: "paragraph",
+                    level: MIN_LEVEL,
                     children: [{ text: "" }],
                 },
             ];
@@ -129,14 +182,23 @@ export default function Edit({ document }) {
             </div>
 
             {/* Кнопки */}
-            {/* <div className="flex gap-4 mb-6">
-                <button
-                    onClick={saveDocument}
-                    className="px-4 py-2 bg-[#21397D] text-white rounded hover:bg-[#1e2d63]"
-                >
-                    Сохранить
-                </button>
-            </div> */}
+
+            <button
+                onClick={downloadDocumentJson}
+                className="mb-4 px-4 py-2 bg-[#21397D] text-white rounded"
+            >
+                Скачать JSON
+            </button>
+
+            <button
+                onClick={() =>
+                    (window.location.href = `/admin/documents/${document.id}/export-docx`)
+                }
+                className="mb-4 ml-2 px-4 py-2 bg-green-700 text-white rounded"
+            >
+                Скачать DOCX
+            </button>
+
             <div className="mb-4">
                 <button
                     onClick={addChapter}
@@ -172,12 +234,25 @@ export default function Edit({ document }) {
                                     className="w-full border rounded px-2 py-1"
                                 />
 
-                                <span>{chapter.open ? "−" : "+"}</span>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            downloadChapterJson(chapter);
+                                        }}
+                                        className="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50"
+                                    >
+                                        JSON
+                                    </button>
+
+                                    <span>{chapter.open ? "−" : "+"}</span>
+                                </div>
                             </div>
                             {/* Контент главы */}
                             {chapter.open && (
                                 <div className="px-4 py-3 bg-white">
                                     <SlateEditor
+                                        chapterPosition={chapter.position}
                                         value={
                                             chapter.content &&
                                             chapter.content.length > 0
@@ -185,6 +260,7 @@ export default function Edit({ document }) {
                                                 : [
                                                       {
                                                           type: "paragraph",
+                                                          level: MIN_LEVEL,
                                                           children: [
                                                               { text: "" },
                                                           ],

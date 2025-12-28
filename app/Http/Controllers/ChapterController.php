@@ -9,6 +9,59 @@ use Inertia\Inertia;
 
 class ChapterController extends Controller
 {
+
+    public function sanitizeSlateNodes(array $nodes): array
+    {
+        $result = [];
+
+        foreach ($nodes as $node) {
+
+            // ✅ LEAF NODE (text + marks)
+            if (array_key_exists('text', $node)) {
+                $cleanLeaf = [
+                    'text' => is_string($node['text']) ? $node['text'] : '',
+                ];
+
+                // ✅ разрешённые marks
+                foreach (['bold', 'italic', 'underline'] as $mark) {
+                    if (!empty($node[$mark])) {
+                        $cleanLeaf[$mark] = true;
+                    }
+                }
+
+                $result[] = $cleanLeaf;
+                continue;
+            }
+
+            // ✅ ELEMENT NODE
+            $cleanNode = $node;
+
+            unset($cleanNode['text']);
+
+            if (
+                !isset($cleanNode['children']) ||
+                !is_array($cleanNode['children']) ||
+                empty($cleanNode['children'])
+            ) {
+                $cleanNode['children'] = [
+                    ['text' => ''],
+                ];
+            }
+
+            // 🔁 рекурсия
+            $cleanNode['children'] = $this->sanitizeSlateNodes(
+                $cleanNode['children']
+            );
+
+            $result[] = $cleanNode;
+        }
+
+        return $result;
+    }
+
+
+
+
     public function store(Request $request, Document $document)
     {
         $chapter = $document->chapters()->create([
@@ -38,7 +91,6 @@ class ChapterController extends Controller
         if ($request->has('content')) {
             $content = $request->input('content');
 
-            // если null или не массив — создаём дефолт
             if (!is_array($content) || empty($content)) {
                 $content = [
                     [
@@ -50,26 +102,7 @@ class ChapterController extends Controller
                 ];
             }
 
-            // чистим Slate-нодЫ (на всякий случай)
-            foreach ($content as &$node) {
-                if (
-                    !isset($node['children']) ||
-                    !is_array($node['children']) ||
-                    empty($node['children'])
-                ) {
-                    $node['children'] = [
-                        ['text' => ''],
-                    ];
-                }
-
-                foreach ($node['children'] as &$child) {
-                    if (!isset($child['text']) || $child['text'] === null) {
-                        $child['text'] = '';
-                    }
-                }
-            }
-
-            $data['content'] = $content;
+            $data['content'] = $this->sanitizeSlateNodes($content);
         }
 
         if ($request->has('open')) {
