@@ -22,13 +22,24 @@ class DocumentController extends Controller
         $phpWord->setDefaultFontSize(14);
         // $section = $phpWord->addSection();
 
+        $phpWord->addTitleStyle(1, [
+            'name' => 'Times New Roman',
+            'size' => 14,
+            'bold' => true,
+            'allCaps' => true
+        ], [
+            'spaceBefore' => 0.75 * 567, // 1 см ДО
+            'spaceAfter'  => 0.75 * 567, // 1 см ПОСЛЕ
+            'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::BOTH,
+        ]);
+
         $phpWord->addParagraphStyle('MainParagraph', [
             'indentation' => [
                 'left'      => 1.25 * 567, // ОБЯЗАТЕЛЬНО
                 'firstLine' => 1.25 * 567, // 1.25 см
             ],
             'spacing' => 0,
-            'spaceAfter' => 100,
+            'spaceAfter' => 0,
             'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::BOTH,
         ]);
 
@@ -45,12 +56,13 @@ class DocumentController extends Controller
 
             $chapterTitle = $chapter->position . ' ' . $chapter->title;
 
-            $section->addTitle($chapterTitle, 2);
+            $section->addTitle($chapterTitle, 1);
 
             // 🔄 Сброс нумерации для главы
             $this->numbering = [
                 0 => $chapter->position,
             ];
+            // $this->numbering = [];
             $this->lastLevel = 2;
 
             $this->renderSlateToDocx($section, $chapter->content);
@@ -123,24 +135,26 @@ class DocumentController extends Controller
     {
         $level = $node['level'] ?? 2;
 
-        // ❗ создаём абзац ВСЕГДА
-        $textRun = $section->addTextRun('MainParagraph');
+        $indentation = $this->insideTable
+            ? $this->getTableIndent()
+            : $this->getIndentByLevel($level);
 
-        // ❗ нумерация — если НЕ внутри таблицы
+        $textRun = $section->addTextRun([
+            'indentation' => $indentation,
+            'spacing' => 0,
+            'spaceAfter' => 100,
+            'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::BOTH,
+        ]);
+
         if (!$this->insideTable) {
             $number = $this->getParagraphNumber($level);
 
-            $textRun->addText(
-                $number,
-                [
-                    'name' => 'Times New Roman',
-                    'size' => 14,
-                    // 'bold' => true,
-                ]
-            );
+            $textRun->addText($number, [
+                'name' => 'Times New Roman',
+                'size' => 14,
+            ]);
         }
 
-        // ❗ если есть текст — добавляем после номера
         if ($this->paragraphHasText($node)) {
             $textRun->addText(' ');
 
@@ -149,6 +163,7 @@ class DocumentController extends Controller
             }
         }
     }
+
 
 
 
@@ -216,6 +231,29 @@ class DocumentController extends Controller
         }
         return false;
     }
+
+    private function getIndentByLevel(int $level): array
+    {
+        $base = 1.25 * 567; // 1.25 см
+        $step = 1.25 * 567;
+
+        return [
+            'left'      => $base + ($level - 2) * $step,
+            // 'firstLine' => $step,
+        ];
+    }
+
+    private function getTableIndent(): array
+    {
+        return [
+            'left' => 0.25 * 567, // 1 см
+            'right' => 0.25 * 567, // 1 см
+        ];
+    }
+
+
+    // 🏠
+
 
     public function dashboard()
     {

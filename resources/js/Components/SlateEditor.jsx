@@ -629,11 +629,16 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
             if (!entry) return;
 
             const [node, path] = entry;
-            const currentLevel = node.level || MIN_LEVEL;
 
-            // 🔽 Shift + Tab
+            // 🔒 ГАРАНТИРУЕМ минимум
+            const currentLevel = Math.max(node.level ?? MIN_LEVEL, MIN_LEVEL);
+
+            // ⬅️ Shift + Tab — уменьшаем уровень
             if (event.shiftKey) {
-                if (currentLevel <= MIN_LEVEL) return;
+                if (currentLevel === MIN_LEVEL) {
+                    // ⛔️ ниже 2 нельзя
+                    return;
+                }
 
                 Transforms.setNodes(
                     editor,
@@ -643,14 +648,16 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
                 return;
             }
 
-            // 🔼 Tab
+            // ➡️ Tab — увеличиваем уровень
             const prevParagraph = findPreviousParagraph(editor, path[0]);
-
             if (!prevParagraph) return;
 
-            const prevLevel = prevParagraph.level || MIN_LEVEL;
+            const prevLevel = Math.max(
+                prevParagraph.level ?? MIN_LEVEL,
+                MIN_LEVEL
+            );
 
-            // ❗ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+            // ❗ вложение разрешено ТОЛЬКО если уровни равны
             if (currentLevel !== prevLevel) return;
 
             Transforms.setNodes(
