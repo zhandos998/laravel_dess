@@ -44,6 +44,7 @@
     );
     background-size: 300%;
     animation: auroraMove 6s ease infinite;
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -79,4 +80,53 @@
 html,
 body {
     overflow: hidden;
+}
+.handle {
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 1px solid #3b82f6;
+    position: absolute;
+}
+
+.handle-n {
+    top: -5px;
+    left: 50%;
+    cursor: n-resize;
+}
+.handle-s {
+    bottom: -5px;
+    left: 50%;
+    cursor: s-resize;
+}
+.handle-e {
+    right: -5px;
+    top: 50%;
+    cursor: e-resize;
+}
+.handle-w {
+    left: -5px;
+    top: 50%;
+    cursor: w-resize;
+}
+
+.handle-nw {
+    top: -5px;
+    left: -5px;
+    cursor: nw-resize;
+}
+.handle-ne {
+    top: -5px;
+    right: -5px;
+    cursor: ne-resize;
+}
+.handle-sw {
+    bottom: -5px;
+    left: -5px;
+    cursor: sw-resize;
+}
+.handle-se {
+    bottom: -5px;
+    right: -5px;
+    cursor: se-resize;
 }

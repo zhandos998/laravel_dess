@@ -1,6 +1,10 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { Slate, Editable, withReact } from "slate-react";
 import { createEditor, Transforms, Editor, Path } from "slate";
+import { InlineMath } from "react-katex";
+
+import { useState } from "react";
+import { ReactEditor } from "slate-react";
 
 const MIN_LEVEL = 2;
 
@@ -126,7 +130,7 @@ const getPreviousParagraphLevel = (editor, tablePath) => {
     return 1;
 };
 
-const Toolbar = ({ editor }) => {
+const Toolbar = ({ editor, onImageClick }) => {
     return (
         <div className="flex gap-2 mb-2 border-b pb-2">
             <ToolbarButton
@@ -173,6 +177,21 @@ const Toolbar = ({ editor }) => {
             <ToolbarButton onMouseDown={() => removeTable(editor)}>
                 🗑 Таблица
             </ToolbarButton>
+
+            <ToolbarButton onMouseDown={() => insertMath(editor)}>
+                ∑
+            </ToolbarButton>
+
+            {/* <ToolbarButton
+                onMouseDown={() => {
+                    const url = prompt("URL изображения");
+                    if (url) insertImage(editor, url);
+                }}
+            >
+                🖼 Фото
+            </ToolbarButton> */}
+
+            <ToolbarButton onMouseDown={onImageClick}>🖼 Фото</ToolbarButton>
         </div>
     );
 };
@@ -394,8 +413,283 @@ const createTable = (rows = 2, cols = 2) => ({
         })),
     })),
 });
+
+const MathElement = ({ attributes, element, children }) => (
+    <span
+        {...attributes}
+        contentEditable={false}
+        className="px-1 bg-gray-100 rounded"
+    >
+        <InlineMath math={element.latex} />
+        {children}
+    </span>
+);
+
+// const ImageElement = ({ attributes, element, children }) => {
+//     return (
+//         <div {...attributes} contentEditable={false} className="my-2">
+//             <img
+//                 src={element.url}
+//                 alt=""
+//                 className="max-w-full rounded border"
+//             />
+//             {children}
+//         </div>
+//     );
+// };
+
+const insertMath = (editor) => {
+    const latex = prompt("Введите LaTeX формулу", "\\frac{a}{b}");
+
+    if (!latex) return;
+
+    Transforms.insertNodes(editor, {
+        type: "math",
+        latex,
+        children: [{ text: "" }],
+    });
+
+    Transforms.move(editor);
+};
+
+const insertImage = (editor, url) => {
+    const image = {
+        type: "image",
+        url,
+        children: [{ text: "" }],
+    };
+
+    Transforms.insertNodes(editor, image);
+    Transforms.insertNodes(editor, {
+        type: "paragraph",
+        level: MIN_LEVEL,
+        children: [{ text: "" }],
+    });
+};
+
+const insertImageFromFile = (editor, file) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        insertImage(editor, reader.result);
+    };
+
+    reader.readAsDataURL(file);
+};
+
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+
+const ImageElement = ({ attributes, element, children, editor }) => {
+    const ref = useRef(null);
+    const [active, setActive] = useState(false);
+
+    const style = {
+        width: element.width,
+        height: element.height,
+        transform: `rotate(${element.rotation || 0}deg)`,
+        transformOrigin: "center center",
+    };
+
+    return (
+        <div
+            {...attributes}
+            contentEditable={false}
+            className="relative inline-block my-4"
+            onClick={() => setActive(true)}
+        >
+            <div
+                ref={ref}
+                style={style}
+                className={`relative border ${
+                    active ? "border-blue-500" : "border-transparent"
+                }`}
+            >
+                <img
+                    src={element.url}
+                    className="w-full h-full pointer-events-none select-none"
+                    draggable={false}
+                />
+
+                {active && (
+                    <>
+                        <ResizeHandles element={element} editor={editor} />
+                        <RotateHandle element={element} editor={editor} />
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex gap-2">
+                            <button
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    rotateImage(editor, element, "left");
+                                }}
+                                className="px-2 py-1 text-sm border rounded bg-white"
+                            >
+                                ↺
+                            </button>
+
+                            <button
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    rotateImage(editor, element, "right");
+                                }}
+                                className="px-2 py-1 text-sm border rounded bg-white"
+                            >
+                                ↻
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+            {children}
+        </div>
+    );
+};
+const ResizeHandles = ({ element, editor }) => {
+    const directions = ["n", "s", "e", "w", "nw", "ne", "sw", "se"];
+
+    return directions.map((dir) => (
+        <ResizeHandle
+            key={dir}
+            direction={dir}
+            element={element}
+            editor={editor}
+        />
+    ));
+};
+
+const ResizeHandle = ({ direction, element, editor }) => {
+    const startResize = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+
+        const startWidth = element.width;
+        const startHeight = element.height;
+
+        const path = ReactEditor.findPath(editor, element);
+
+        const onMove = (e) => {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            const isRotated = (element.rotation || 0) % 180 !== 0;
+
+            const deltaX = isRotated ? dy : dx;
+            const deltaY = isRotated ? dx : dy;
+
+            let width = startWidth;
+            let height = startHeight;
+
+            if (direction.includes("e")) width += deltaX;
+            if (direction.includes("w")) width -= deltaX;
+            if (direction.includes("s")) height += deltaY;
+            if (direction.includes("n")) height -= deltaY;
+
+            width = Math.max(100, width);
+            height = Math.max(100, height);
+
+            Transforms.setNodes(editor, { width, height }, { at: path });
+        };
+
+        const stop = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", stop);
+        };
+
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", stop);
+    };
+
+    return (
+        <div
+            onMouseDown={startResize}
+            className={`handle handle-${direction}`}
+        />
+    );
+};
+
+const rotateImage = (editor, element, direction) => {
+    const path = ReactEditor.findPath(editor, element);
+
+    const current = element.rotation || 0;
+    const delta = direction === "left" ? -90 : 90;
+
+    let next = (current + delta) % 360;
+    if (next < 0) next += 360;
+
+    // 🔁 Если поворот на 90 / 270 — меняем width ↔ height
+    // if (next % 180 !== current % 180) {
+    //     Transforms.setNodes(
+    //         editor,
+    //         {
+    //             width: Math.round(element.height),
+    //             height: Math.round(element.width),
+    //         },
+    //         { at: path }
+    //     );
+    // }
+
+    // 🔄 Поворот
+    Transforms.setNodes(editor, { rotation: next }, { at: path });
+};
+
+const RotateHandle = ({ element, editor }) => {
+    const startRotate = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const rect = e.target.parentElement.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        const path = ReactEditor.findPath(editor, element);
+
+        const onMove = (e) => {
+            const angle =
+                Math.atan2(e.clientY - centerY, e.clientX - centerX) *
+                (180 / Math.PI);
+
+            Transforms.setNodes(editor, { rotation: angle }, { at: path });
+        };
+
+        const stop = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", stop);
+        };
+
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", stop);
+    };
+
+    return (
+        <div
+            onMouseDown={startRotate}
+            className="absolute -top-8 left-1/2 w-3 h-3 bg-blue-500 rounded-full cursor-grab"
+        />
+    );
+};
+
 export default function SlateEditor({ value, onChange, chapterPosition }) {
-    const editor = useMemo(() => withReact(createEditor()), []);
+    const inputRef = useRef(null);
+
+    const editor = useMemo(() => {
+        const e = withReact(createEditor());
+
+        const { isVoid, isInline } = e;
+
+        e.isVoid = (element) =>
+            element.type === "image" ? true : isVoid(element);
+
+        e.isInline = (element) =>
+            element.type === "math" ? true : isInline(element);
+
+        return e;
+    }, []);
+
     const renderLeaf = useCallback((props) => <Leaf {...props} />, []);
 
     const safeValue =
@@ -432,6 +726,10 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
                     return <TableRowElement {...props} />;
                 case "table-cell":
                     return <TableCellElement {...props} />;
+                case "math":
+                    return <MathElement {...props} />;
+                case "image":
+                    return <ImageElement {...props} editor={editor} />;
                 default:
                     return <ParagraphElement {...props} />;
             }
@@ -713,7 +1011,23 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
 
     return (
         <Slate editor={editor} initialValue={safeValue} onChange={handleChange}>
-            <Toolbar editor={editor} />
+            <Toolbar
+                editor={editor}
+                onImageClick={() => inputRef.current.click()}
+            />
+
+            <input
+                type="file"
+                accept="image/*"
+                hidden
+                ref={inputRef}
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) insertImageFromFile(editor, file);
+                    e.target.value = ""; // чтобы можно было выбрать тот же файл снова
+                }}
+            />
+
             <Editable
                 className="border rounded p-3 min-h-[120px]"
                 placeholder="Начните писать..."
