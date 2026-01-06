@@ -74,7 +74,7 @@ class ChapterController extends Controller
                     ],
                 ],
             ],
-            'open' => true,
+            'open' => false,
             'position' => $document->chapters()->max('position') + 1,
         ]);
         return response()->json($chapter);
@@ -106,7 +106,7 @@ class ChapterController extends Controller
         }
 
         if ($request->has('open')) {
-            $data['open'] = (bool) $request->open;
+            $data['open'] = (bool) 0;
         }
 
         $chapter->update($data);
