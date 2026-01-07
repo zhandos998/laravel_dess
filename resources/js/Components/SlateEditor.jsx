@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef } from "react";
+import { useMemo, useCallback, useRef, useEffect } from "react";
 import { Slate, Editable, withReact } from "slate-react";
 import { createEditor, Transforms, Editor, Path } from "slate";
 import { InlineMath } from "react-katex";
@@ -371,15 +371,24 @@ const ParagraphElement = ({
     return (
         <div
             {...attributes}
-            className="flex gap-3"
+            className={`
+                flex gap-3
+                px-2 py-1
+                ${
+                    hideNumber
+                        ? ""
+                        : "border-b border-gray-200 focus-within:border-blue-400"
+                }
+            `}
             style={{
-                marginLeft: level == 0 ? 0 : (level - MIN_LEVEL) * 24,
+                paddingLeft:
+                    level === 0 || hideNumber ? 0 : (level - MIN_LEVEL) * 24,
             }}
         >
-            {!(level == 0) && (
+            {!hideNumber && level !== 0 && (
                 <span
                     contentEditable={false}
-                    className="text-gray-400 w-16 select-none"
+                    className="text-gray-400 w-16 select-none px-2"
                 >
                     {chapterPosition && position
                         ? `${chapterPosition}.${position}`
@@ -387,7 +396,7 @@ const ParagraphElement = ({
                 </span>
             )}
 
-            <div className="flex-1">{children}</div>
+            <span className="flex-1 inline">{children}</span>
         </div>
     );
 };
@@ -425,19 +434,6 @@ const MathElement = ({ attributes, element, children }) => (
     </span>
 );
 
-// const ImageElement = ({ attributes, element, children }) => {
-//     return (
-//         <div {...attributes} contentEditable={false} className="my-2">
-//             <img
-//                 src={element.url}
-//                 alt=""
-//                 className="max-w-full rounded border"
-//             />
-//             {children}
-//         </div>
-//     );
-// };
-
 const insertMath = (editor) => {
     const latex = prompt("Введите LaTeX формулу", "\\frac{a}{b}");
 
@@ -452,19 +448,23 @@ const insertMath = (editor) => {
     Transforms.move(editor);
 };
 
-const insertImage = (editor, url) => {
-    const image = {
+const insertImage = (editor, url, width, height) => {
+    const imageNode = {
         type: "image",
+        id: crypto.randomUUID(),
         url,
-        children: [{ text: "" }],
+        width,
+        height,
+        rotation: 0,
+        children: [{ text: "" }], // ОБЯЗАТЕЛЬНО
     };
 
-    Transforms.insertNodes(editor, image);
-    Transforms.insertNodes(editor, {
-        type: "paragraph",
-        level: MIN_LEVEL,
-        children: [{ text: "" }],
-    });
+    // 1️⃣ вставляем image В ТЕКСТ
+    Transforms.insertNodes(editor, imageNode);
+
+    // 2️⃣ ОБЯЗАТЕЛЬНО добавляем текст после,
+    // чтобы курсор мог туда встать
+    Transforms.insertText(editor, " ");
 };
 
 const insertImageFromFile = (editor, file) => {
@@ -477,75 +477,339 @@ const insertImageFromFile = (editor, file) => {
     reader.readAsDataURL(file);
 };
 
-// ------------------------------------------------------------------------
-// ------------------------------------------------------------------------
-// ------------------------------------------------------------------------
-// ------------------------------------------------------------------------
-// ------------------------------------------------------------------------
+const getResizeCursor = (direction, rotation) => {
+    const rot = ((rotation % 360) + 360) % 360;
 
-const ImageElement = ({ attributes, element, children, editor }) => {
-    const ref = useRef(null);
-    const [active, setActive] = useState(false);
-
-    const style = {
-        width: element.width,
-        height: element.height,
-        transform: `rotate(${element.rotation || 0}deg)`,
-        transformOrigin: "center center",
+    const map0 = {
+        n: "ns-resize",
+        s: "ns-resize",
+        e: "ew-resize",
+        w: "ew-resize",
+        ne: "nesw-resize",
+        sw: "nesw-resize",
+        nw: "nwse-resize",
+        se: "nwse-resize",
     };
 
+    const map90 = {
+        n: "ew-resize",
+        s: "ew-resize",
+        e: "ns-resize",
+        w: "ns-resize",
+        ne: "nwse-resize",
+        sw: "nwse-resize",
+        nw: "nesw-resize",
+        se: "nesw-resize",
+    };
+
+    if (rot === 90 || rot === 270) {
+        return map90[direction];
+    }
+
+    return map0[direction];
+};
+
+const InlineImageElement = ({
+    attributes,
+    element,
+    editor,
+    active,
+    onActivate,
+}) => {
+    const rotation = element.rotation || 0;
+    const width = element.width || 64;
+    const height = element.height || 64;
+
+    const isSideways = rotation === 90 || rotation === 270;
+
+    const layoutWidth = isSideways ? height : width;
+    const layoutHeight = isSideways ? width : height;
+
     return (
-        <div
+        <span
             {...attributes}
+            data-inline-image
             contentEditable={false}
-            className="relative inline-block my-4"
-            onClick={() => setActive(true)}
+            className="inline-block relative align-middle mx-1"
+            style={{ width: layoutWidth, height: layoutHeight }}
+            onMouseDown={(e) => {
+                e.stopPropagation();
+                onActivate(); // ✅ АКТИВАЦИЯ
+            }}
         >
-            <div
-                ref={ref}
-                style={style}
-                className={`relative border ${
-                    active ? "border-blue-500" : "border-transparent"
-                }`}
+            <span
+                className="absolute"
+                style={{
+                    width,
+                    height,
+                    top: "50%",
+                    left: "50%",
+                    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                }}
             >
                 <img
                     src={element.url}
-                    className="w-full h-full pointer-events-none select-none"
                     draggable={false}
+                    className="pointer-events-none select-none"
+                    style={{ width, height }}
                 />
 
                 {active && (
-                    <>
-                        <ResizeHandles element={element} editor={editor} />
-                        <RotateHandle element={element} editor={editor} />
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex gap-2">
-                            <button
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    rotateImage(editor, element, "left");
-                                }}
-                                className="px-2 py-1 text-sm border rounded bg-white"
-                            >
-                                ↺
-                            </button>
-
-                            <button
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    rotateImage(editor, element, "right");
-                                }}
-                                className="px-2 py-1 text-sm border rounded bg-white"
-                            >
-                                ↻
-                            </button>
-                        </div>
-                    </>
+                    <span className="absolute inset-0 border border-blue-500 pointer-events-none" />
                 )}
+
+                {active && (
+                    <InlineResizeHandles element={element} editor={editor} />
+                )}
+            </span>
+
+            {active && (
+                <span className="absolute -top-6 left-1/2 -translate-x-1/2 flex gap-1">
+                    <button
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            rotateInlineImage(editor, element, -90);
+                        }}
+                        className="px-1 text-xs bg-white border"
+                    >
+                        ↺
+                    </button>
+                    <button
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            rotateInlineImage(editor, element, 90);
+                        }}
+                        className="px-1 text-xs bg-white border"
+                    >
+                        ↻
+                    </button>
+                </span>
+            )}
+        </span>
+    );
+};
+
+const insertInlineImage = (editor, url) => {
+    const inlineImage = {
+        type: "inline-image",
+        id: crypto.randomUUID(), // 🔥 ОБЯЗАТЕЛЬНО
+        url,
+        width: 32,
+        height: 32,
+        rotation: 0,
+        children: [{ text: "" }],
+    };
+
+    Transforms.insertNodes(editor, inlineImage);
+    Transforms.insertText(editor, " ");
+};
+
+const InlineResizeHandles = ({ element, editor }) => {
+    const directions = ["n", "s", "e", "w", "nw", "ne", "sw", "se"];
+
+    return directions.map((dir) => (
+        <InlineResizeHandle
+            key={dir}
+            direction={dir}
+            element={element}
+            editor={editor}
+        />
+    ));
+};
+
+const InlineResizeHandle = ({ direction, element, editor }) => {
+    const startResize = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+
+        const startWidth = element.width;
+        const startHeight = element.height;
+
+        const aspect = startWidth / startHeight;
+        const isCorner = ["nw", "ne", "sw", "se"].includes(direction);
+
+        const path = ReactEditor.findPath(editor, element);
+        const angle = ((element.rotation || 0) * Math.PI) / 180;
+
+        const onMove = (e) => {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            const localDx = dx * Math.cos(angle) + dy * Math.sin(angle);
+            const localDy = -dx * Math.sin(angle) + dy * Math.cos(angle);
+
+            let width = startWidth;
+            let height = startHeight;
+
+            if (isCorner) {
+                const delta =
+                    Math.abs(localDx) > Math.abs(localDy) ? localDx : localDy;
+
+                if (direction.includes("e")) width = startWidth + delta;
+                if (direction.includes("w")) width = startWidth - delta;
+
+                width = Math.max(16, width);
+                height = Math.round(width / aspect);
+            } else {
+                if (direction.includes("e")) width += localDx;
+                if (direction.includes("w")) width -= localDx;
+                if (direction.includes("s")) height += localDy;
+                if (direction.includes("n")) height -= localDy;
+            }
+
+            width = Math.max(16, Math.round(width));
+            height = Math.max(16, Math.round(height));
+
+            Transforms.setNodes(editor, { width, height }, { at: path });
+        };
+
+        const stop = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", stop);
+        };
+
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", stop);
+    };
+
+    return (
+        <span
+            onMouseDown={startResize}
+            className={`handle handle-${direction}`}
+            style={{
+                cursor: getResizeCursor(direction, element.rotation),
+            }}
+        />
+    );
+};
+
+const rotateInlineImage = (editor, element, delta) => {
+    const path = ReactEditor.findPath(editor, element);
+    const current = element.rotation || 0;
+
+    let next = (current + delta) % 360;
+    if (next < 0) next += 360;
+
+    Transforms.setNodes(editor, { rotation: next }, { at: path });
+};
+
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+
+const ImageElement = ({
+    attributes,
+    element,
+    editor,
+    active,
+    onActivate,
+    children,
+}) => {
+    const containerRef = useRef(null);
+
+    const rotation = element.rotation || 0;
+
+    const isSideways = rotation === 90 || rotation === 270;
+
+    const layoutWidth = isSideways ? element.height : element.width;
+    const layoutHeight = isSideways ? element.width : element.height;
+
+    const offsetX = isSideways ? (element.height - element.width) / 2 : 0;
+    const offsetY = isSideways ? (element.width - element.height) / 2 : 0;
+
+    return (
+        <div
+            data-image
+            // ref={containerRef}
+            {...attributes}
+            contentEditable={false}
+            className="relative inline-block align-middle mx-1"
+            onMouseDown={(e) => {
+                e.stopPropagation();
+                onActivate();
+            }}
+        >
+            {/* 🔹 1. Layout контейнер (НЕ вращается) */}
+            <div
+                className="relative"
+                style={{
+                    width: layoutWidth,
+                    height: layoutHeight,
+                }}
+            >
+                {/* 🔹 2. Visual контейнер (ВРАЩАЕТСЯ) */}
+                <div
+                    className="absolute"
+                    style={{
+                        width: element.width,
+                        height: element.height,
+                        top: "50%",
+                        left: "50%",
+                        transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                        transformOrigin: "center",
+                    }}
+                >
+                    {/* рамка */}
+                    {active && (
+                        <div className="absolute inset-0 border border-blue-500 pointer-events-none" />
+                    )}
+
+                    <img
+                        src={element.url}
+                        style={{
+                            width: element.width,
+                            height: element.height,
+                        }}
+                        className="pointer-events-none select-none"
+                        draggable={false}
+                    />
+
+                    {active && (
+                        <ResizeHandles element={element} editor={editor} />
+                    )}
+                </div>
+
+                {/* 🔹 ВИЗУАЛЬНАЯ РАМКА (НЕ ВРАЩАЕТСЯ) */}
+                {/* {active && (
+                    <div className="absolute inset-0 border border-blue-500 pointer-events-none" />
+                )} */}
             </div>
+
+            {/* 🔹 КНОПКИ ПОВОРОТА (НЕ ВРАЩАЮТСЯ) */}
+            {active && (
+                <div className="absolute -top-10 left-1/2 -translate-x-1/2 mb-6 flex gap-2">
+                    <button
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            rotateImage(editor, element, "left");
+                        }}
+                        className="px-2 py-1 border rounded bg-white"
+                    >
+                        ↺
+                    </button>
+
+                    <button
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            rotateImage(editor, element, "right");
+                        }}
+                        className="px-2 py-1 border rounded bg-white"
+                    >
+                        ↻
+                    </button>
+                </div>
+            )}
+
             {children}
         </div>
     );
 };
+
 const ResizeHandles = ({ element, editor }) => {
     const directions = ["n", "s", "e", "w", "nw", "ne", "sw", "se"];
 
@@ -567,30 +831,55 @@ const ResizeHandle = ({ direction, element, editor }) => {
         const startX = e.clientX;
         const startY = e.clientY;
 
-        const startWidth = element.width;
-        const startHeight = element.height;
+        const rect = e.target.parentElement.getBoundingClientRect();
+
+        const startWidth = element.width ?? rect.width;
+        const startHeight = element.height ?? rect.height;
+
+        const aspect = startWidth / startHeight;
+        const isCorner =
+            direction === "nw" ||
+            direction === "ne" ||
+            direction === "sw" ||
+            direction === "se";
 
         const path = ReactEditor.findPath(editor, element);
+        const angle = ((element.rotation || 0) * Math.PI) / 180;
 
         const onMove = (e) => {
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
 
-            const isRotated = (element.rotation || 0) % 180 !== 0;
-
-            const deltaX = isRotated ? dy : dx;
-            const deltaY = isRotated ? dx : dy;
+            // 🔥 перевод в локальные координаты картинки
+            const localDx = dx * Math.cos(angle) + dy * Math.sin(angle);
+            const localDy = -dx * Math.sin(angle) + dy * Math.cos(angle);
 
             let width = startWidth;
             let height = startHeight;
 
-            if (direction.includes("e")) width += deltaX;
-            if (direction.includes("w")) width -= deltaX;
-            if (direction.includes("s")) height += deltaY;
-            if (direction.includes("n")) height -= deltaY;
+            if (isCorner) {
+                // выбираем ведущую ось
+                const delta =
+                    Math.abs(localDx) > Math.abs(localDy) ? localDx : localDy;
 
-            width = Math.max(100, width);
-            height = Math.max(100, height);
+                if (direction.includes("e")) width = startWidth + delta;
+                if (direction.includes("w")) width = startWidth - delta;
+
+                width = Math.max(50, Math.round(width));
+                height = Math.round(width / aspect);
+            } else {
+                // обычный resize для n / s / e / w
+                if (direction.includes("e")) width += localDx;
+                if (direction.includes("w")) width -= localDx;
+                if (direction.includes("s")) height += localDy;
+                if (direction.includes("n")) height -= localDy;
+
+                width = Math.max(50, Math.round(width));
+                height = Math.max(50, Math.round(height));
+            }
+
+            width = Math.max(50, Math.round(width));
+            height = Math.max(50, Math.round(height));
 
             Transforms.setNodes(editor, { width, height }, { at: path });
         };
@@ -608,6 +897,9 @@ const ResizeHandle = ({ direction, element, editor }) => {
         <div
             onMouseDown={startResize}
             className={`handle handle-${direction}`}
+            style={{
+                cursor: getResizeCursor(direction, element.rotation),
+            }}
         />
     );
 };
@@ -621,19 +913,6 @@ const rotateImage = (editor, element, direction) => {
     let next = (current + delta) % 360;
     if (next < 0) next += 360;
 
-    // 🔁 Если поворот на 90 / 270 — меняем width ↔ height
-    // if (next % 180 !== current % 180) {
-    //     Transforms.setNodes(
-    //         editor,
-    //         {
-    //             width: Math.round(element.height),
-    //             height: Math.round(element.width),
-    //         },
-    //         { at: path }
-    //     );
-    // }
-
-    // 🔄 Поворот
     Transforms.setNodes(editor, { rotation: next }, { at: path });
 };
 
@@ -674,6 +953,8 @@ const RotateHandle = ({ element, editor }) => {
 };
 
 export default function SlateEditor({ value, onChange, chapterPosition }) {
+    const [activeImageId, setActiveImageId] = useState(null);
+
     const inputRef = useRef(null);
 
     const editor = useMemo(() => {
@@ -681,11 +962,13 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
 
         const { isVoid, isInline } = e;
 
-        e.isVoid = (element) =>
-            element.type === "image" ? true : isVoid(element);
-
         e.isInline = (element) =>
-            element.type === "math" ? true : isInline(element);
+            element.type === "inline-image" || element.type === "math"
+                ? true
+                : isInline(element);
+
+        e.isVoid = (element) =>
+            element.type === "inline-image" ? true : isVoid(element);
 
         return e;
     }, []);
@@ -728,8 +1011,25 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
                     return <TableCellElement {...props} />;
                 case "math":
                     return <MathElement {...props} />;
-                case "image":
-                    return <ImageElement {...props} editor={editor} />;
+                case "inline-image":
+                    return (
+                        <InlineImageElement
+                            {...props}
+                            editor={editor}
+                            active={activeImageId === element.id}
+                            onActivate={() => setActiveImageId(element.id)}
+                        />
+                    );
+
+                // case "image":
+                //     return (
+                //         <ImageElement
+                //             {...props}
+                //             editor={editor}
+                //             active={activeImageId === element.id}
+                //             onActivate={() => setActiveImageId(element.id)}
+                //         />
+                //     );
                 default:
                     return <ParagraphElement {...props} />;
             }
@@ -870,46 +1170,6 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
             );
         }
 
-        // TAB → вложенность
-        // if (event.key === "Tab") {
-        //     event.preventDefault();
-
-        //     const entry = Editor.above(editor, {
-        //         match: (n) => n.type === "paragraph",
-        //     });
-
-        //     if (!entry) return;
-
-        //     const [node, path] = entry;
-        //     const currentLevel = node.level || 1;
-
-        //     // 🔥 ИЩЕМ предыдущий paragraph, пропуская table
-        //     let prevParagraph = null;
-
-        //     for (let i = path[0] - 1; i >= 0; i--) {
-        //         const prevNode = editor.children[i];
-        //         if (prevNode.type === "paragraph") {
-        //             prevParagraph = prevNode;
-        //             break;
-        //         }
-        //     }
-
-        //     // ❌ если реально нет родителя — нельзя Tab
-        //     if (!prevParagraph) return;
-
-        //     const prevLevel = prevParagraph.level || 1;
-
-        //     // ❌ запрещаем Tab, если нет логического родителя
-        //     if (currentLevel > prevLevel) return;
-
-        //     // ✅ можно вложить
-        //     Transforms.setNodes(
-        //         editor,
-        //         { level: currentLevel + 1 },
-        //         { at: path }
-        //     );
-        // }
-
         // TAB / SHIFT+TAB для paragraph (НЕ в таблице)
         if (event.key === "Tab") {
             const isInTableCell = Editor.above(editor, {
@@ -986,6 +1246,7 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
                 return;
             }
         }
+
         if (event.key === "Delete") {
             const cellEntry = Editor.above(editor, {
                 match: (n) => n.type === "table-cell",
@@ -1023,8 +1284,17 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
                 ref={inputRef}
                 onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) insertImageFromFile(editor, file);
-                    e.target.value = ""; // чтобы можно было выбрать тот же файл снова
+                    if (!file) return;
+
+                    const reader = new FileReader();
+
+                    reader.onload = () => {
+                        insertInlineImage(editor, reader.result);
+                    };
+
+                    reader.readAsDataURL(file);
+
+                    e.target.value = "";
                 }}
             />
 
@@ -1034,6 +1304,14 @@ export default function SlateEditor({ value, onChange, chapterPosition }) {
                 renderElement={renderElement}
                 renderLeaf={renderLeaf}
                 onKeyDown={handleKeyDown}
+                onMouseDownCapture={(e) => {
+                    if (
+                        !e.target.closest("[data-image]") &&
+                        !e.target.closest("[data-inline-image]")
+                    ) {
+                        setActiveImageId(null);
+                    }
+                }}
             />
         </Slate>
     );

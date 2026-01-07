@@ -82,51 +82,66 @@ body {
     overflow: hidden;
 }
 .handle {
-    width: 10px;
-    height: 10px;
-    background: white;
-    border: 1px solid #3b82f6;
     position: absolute;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border: 1px solid #3b82f6; /* blue-500 */
+    box-sizing: border-box;
 }
 
 .handle-n {
-    top: -5px;
+    top: 0;
     left: 50%;
-    cursor: n-resize;
+    transform: translate(-50%, -50%);
+    cursor: ns-resize;
 }
+
 .handle-s {
-    bottom: -5px;
+    bottom: 0;
     left: 50%;
-    cursor: s-resize;
+    transform: translate(-50%, 50%);
+    cursor: ns-resize;
 }
+
 .handle-e {
-    right: -5px;
+    right: 0;
     top: 50%;
-    cursor: e-resize;
+    transform: translate(50%, -50%);
+    cursor: ew-resize;
 }
+
 .handle-w {
-    left: -5px;
+    left: 0;
     top: 50%;
-    cursor: w-resize;
+    transform: translate(-50%, -50%);
+    cursor: ew-resize;
 }
 
 .handle-nw {
-    top: -5px;
-    left: -5px;
-    cursor: nw-resize;
+    top: 0;
+    left: 0;
+    transform: translate(-50%, -50%);
+    cursor: nwse-resize;
 }
+
 .handle-ne {
-    top: -5px;
-    right: -5px;
-    cursor: ne-resize;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    cursor: nesw-resize;
 }
+
 .handle-sw {
-    bottom: -5px;
-    left: -5px;
-    cursor: sw-resize;
+    bottom: 0;
+    left: 0;
+    transform: translate(-50%, 50%);
+    cursor: nesw-resize;
 }
+
 .handle-se {
-    bottom: -5px;
-    right: -5px;
-    cursor: se-resize;
+    bottom: 0;
+    right: 0;
+    transform: translate(50%, 50%);
+    cursor: nwse-resize;
 }

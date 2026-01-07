@@ -143,25 +143,30 @@ export default function Edit({ document }) {
         );
     };
 
-    const saveTimeout = useRef(null);
+    const chaptersRef = useRef(chapters);
+
+    // всегда держим ref актуальным
+    useEffect(() => {
+        chaptersRef.current = chapters;
+    }, [chapters]);
 
     useEffect(() => {
-        if (!chapters.length) return;
+        const interval = setInterval(() => {
+            if (!chaptersRef.current.length) return;
 
-        clearTimeout(saveTimeout.current);
+            console.log("💾 autosave all chapters");
 
-        saveTimeout.current = setTimeout(() => {
-            chapters.forEach((chapter) => {
+            chaptersRef.current.forEach((chapter) => {
                 axios.put(`/admin/chapters/${chapter.id}`, {
                     title: chapter.title,
                     content: chapter.content,
                     open: chapter.open,
                 });
             });
-        }, 800);
+        }, 60_000); // ✅ 1 минута
 
-        return () => clearTimeout(saveTimeout.current);
-    }, [chapters]);
+        return () => clearInterval(interval);
+    }, []);
 
     // console.log("DOCUMENT:", document);
     // console.log("CHAPTERS:", chapters);
