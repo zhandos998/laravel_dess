@@ -145,3 +145,15 @@ body {
     transform: translate(50%, 50%);
     cursor: nwse-resize;
 }
+
+.inline-table *:focus {
+    outline: none !important;
+}
+
+.inline-table *:focus-visible {
+    outline: none !important;
+}
+
+.inline-table *:focus-within {
+    outline: none !important;
+}

@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\IOFactory;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+// use PhpOffice\PhpWord\Shared\XMLWriter;
 
 class DocumentController extends Controller
 {
@@ -133,7 +134,7 @@ class DocumentController extends Controller
 
     private function renderParagraph($section, array $node)
     {
-        $level = $node['level'] ?? 2;
+        $level = max(2, $node['level'] ?? 2);
 
         $indentation = $this->insideTable
             ? $this->getTableIndent()
@@ -146,9 +147,10 @@ class DocumentController extends Controller
             'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::BOTH,
         ]);
 
-        if (!$this->insideTable) {
-            $number = $this->getParagraphNumber($level);
+        $hasText = $this->paragraphHasText($node);
 
+        if (!$this->insideTable && $hasText) {
+            $number = $this->getParagraphNumber($level);
             $textRun->addText($number, [
                 'name' => 'Times New Roman',
                 'size' => 14,
@@ -159,6 +161,17 @@ class DocumentController extends Controller
             $textRun->addText(' ');
 
             foreach ($node['children'] ?? [] as $leaf) {
+
+                // if (($leaf['type'] ?? '') === 'math') {
+                //     $this->addMathOMML($section, $leaf['latex']);
+                //     continue;
+                // }
+
+                if (($leaf['type'] ?? '') === 'inline-image') {
+                    $this->addInlineImage($textRun, $leaf);
+                    continue;
+                }
+
                 $this->addTextLeaf($textRun, $leaf);
             }
         }
@@ -169,6 +182,7 @@ class DocumentController extends Controller
 
     private function addTextLeaf($textRun, array $leaf)
     {
+
         $style = [
             'name' => 'Times New Roman',
             'size' => 14,
@@ -186,7 +200,53 @@ class DocumentController extends Controller
             $style['underline'] = 'single';
         }
 
-        $textRun->addText($leaf['text'] ?? '', $style);
+        $text = $leaf['text'] ?? '';
+
+        // print("<pre>");
+
+        if (!mb_check_encoding($text, 'UTF-8')) {
+            $text = mb_convert_encoding($text, 'UTF-8', 'Windows-1251');
+        }
+        $lines = preg_split("/\R/u", $text);
+        // print_r($lines);
+
+        foreach ($lines as $i => $line) {
+            if ($i > 0) {
+                $textRun->addTextBreak();
+            }
+
+            if ($line !== '') {
+                $textRun->addText($line, $style);
+            }
+        }
+        // $textRun->addText($leaf['text'] ?? '', $style);
+    }
+
+
+    private function addInlineImage($textRun, array $leaf)
+    {
+        if (empty($leaf['url'])) {
+            return;
+        }
+
+        // base64 → файл
+        if (preg_match('/base64,(.*)$/', $leaf['url'], $matches)) {
+            $imageData = base64_decode($matches[1]);
+        } else {
+            return;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'img_');
+        file_put_contents($tmp, $imageData);
+
+        $textRun->addImage($tmp, [
+            'width'  => $leaf['width'] ?? 100,
+            'height' => $leaf['height'] ?? 100,
+            'rotation' => $leaf['rotation'] ?? 0,
+            'wrappingStyle' => 'inline',
+        ]);
+
+        // unlink($tmp);
     }
 
     private function getParagraphNumber(int $level): string
@@ -251,6 +311,41 @@ class DocumentController extends Controller
         ];
     }
 
+    // private function addMath($section, string $omml)
+    // {
+    //     $xmlWriter = new XMLWriter(XMLWriter::STORAGE_MEMORY);
+    //     $xmlWriter->writeRaw($omml);
+
+    //     $section->addObject($xmlWriter->getData());
+    // }
+
+    // private function addMathOMML($section, string $latex)
+    // {
+    //     $escaped = htmlspecialchars($latex, ENT_XML1);
+
+    //     $omml = <<<XML
+    //         <w:oMathPara xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    //         <w:oMath>
+    //             <w:sSup>
+    //             <w:e><w:r><w:t>x</w:t></w:r></w:e>
+    //             <w:sup><w:r><w:t>2</w:t></w:r></w:sup>
+    //             </w:sSup>
+    //         </w:oMath>
+    //         </w:oMathPara>
+    //         XML;
+
+    //     $this->addMathOMMLRaw($section, $omml);
+
+    //     $section->addTextRun()->addText($omml, [], ['preserveLineBreaks' => true]);
+    // }
+
+    // private function addMathOMMLRaw($section, string $omml)
+    // {
+    //     $writer = new XMLWriter(XMLWriter::STORAGE_MEMORY);
+    //     $writer->writeRaw($omml);
+
+    //     $section->addObject($writer->getData());
+    // }
 
     // 🏠
 
