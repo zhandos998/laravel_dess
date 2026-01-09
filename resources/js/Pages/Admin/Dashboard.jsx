@@ -8,9 +8,9 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold text-[#21397D] mb-2">
                     Добро пожаловать 👋
                 </h1>
-                <p className="text-gray-600">
+                {/* <p className="text-gray-600">
                     Управляйте документами в удобной админ-панели.
-                </p>
+                </p> */}
             </div>
 
             {/* Основной контент */}
@@ -32,7 +32,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Карточка 2 */}
-                <div className="bg-white shadow rounded-lg p-6 border border-gray-100 hover:shadow-lg transition">
+                {/* <div className="bg-white shadow rounded-lg p-6 border border-gray-100 hover:shadow-lg transition">
                     <h2 className="text-lg font-semibold text-[#21397D] mb-2">
                         AI Логи
                     </h2>
@@ -45,7 +45,7 @@ export default function Dashboard() {
                     >
                         Перейти →
                     </a>
-                </div>
+                </div> */}
 
                 {/* Карточка 3 */}
                 {/* <div className="bg-white shadow rounded-lg p-6 border border-gray-100 hover:shadow-lg transition">

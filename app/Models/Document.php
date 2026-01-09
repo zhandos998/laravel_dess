@@ -14,10 +14,15 @@ class Document extends Model
         'uuid',
         'title',
         'json_code',
+        'cover',
+        'preface',
+
     ];
 
     protected $casts = [
         'json_code' => 'array',
+        'cover' => 'array',
+        'preface' => 'array',
     ];
 
     protected static function booted()

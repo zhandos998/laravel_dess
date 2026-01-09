@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
+    private bool $enableNumbering = true;
     private array $numbering = [];
     private int $lastLevel = 2;
     private bool $insideTable = false;
@@ -37,7 +38,7 @@ class DocumentController extends Controller
         $phpWord->addParagraphStyle('MainParagraph', [
             'indentation' => [
                 'left'      => 1.25 * 567, // ОБЯЗАТЕЛЬНО
-                'firstLine' => 1.25 * 567, // 1.25 см
+                'firstLine' => 0 * 567, // 1.25 см
             ],
             'spacing' => 0,
             'spaceAfter' => 0,
@@ -50,8 +51,39 @@ class DocumentController extends Controller
             'marginTop'    => 2 * 567, // 1134
             'marginBottom' => 2 * 567, // 1134
         ]);
+
+        $this->addPageNumberFooter($section);
+
+        // $section = $phpWord->addSection([
+        //     'marginLeft'   => 3 * 567,
+        //     'marginRight'  => 1 * 567,
+        //     'marginTop'    => 2 * 567,
+        //     'marginBottom' => 2 * 567,
+        // ]);
+
         // 🟦 Заголовок документа
         // $section->addTitle($document->title, 1);
+
+        $this->renderCover($phpWord, $document);
+        // ❌ выключаем нумерацию
+        $this->enableNumbering = false;
+
+        $section->addTitle('Предисловие', 1);
+        $this->renderSlateToDocx($section, $document->preface);
+        $section->addPageBreak();
+
+        $section->addTitle('Содержание', 1);
+        $section->addTOC();
+        $section->addPageBreak();
+
+        // ✅ включаем обратно
+        $this->enableNumbering = true;
+
+        // ❗ сбрасываем счётчики перед главами
+        $this->numbering = [];
+        $this->lastLevel = 2;
+
+
 
         foreach ($document->chapters()->orderBy('position')->get() as $chapter) {
 
@@ -130,8 +162,6 @@ class DocumentController extends Controller
         $this->insideTable = false;
     }
 
-
-
     private function renderParagraph($section, array $node)
     {
         $level = max(2, $node['level'] ?? 2);
@@ -149,7 +179,11 @@ class DocumentController extends Controller
 
         $hasText = $this->paragraphHasText($node);
 
-        if (!$this->insideTable && $hasText) {
+        if (
+            $this->enableNumbering &&
+            !$this->insideTable &&
+            $hasText
+        ) {
             $number = $this->getParagraphNumber($level);
             $textRun->addText($number, [
                 'name' => 'Times New Roman',
@@ -176,9 +210,6 @@ class DocumentController extends Controller
             }
         }
     }
-
-
-
 
     private function addTextLeaf($textRun, array $leaf)
     {
@@ -222,7 +253,6 @@ class DocumentController extends Controller
         // $textRun->addText($leaf['text'] ?? '', $style);
     }
 
-
     private function addInlineImage($textRun, array $leaf)
     {
         if (empty($leaf['url'])) {
@@ -242,7 +272,6 @@ class DocumentController extends Controller
         $textRun->addImage($tmp, [
             'width'  => $leaf['width'] ?? 100,
             'height' => $leaf['height'] ?? 100,
-            'rotation' => $leaf['rotation'] ?? 0,
             'wrappingStyle' => 'inline',
         ]);
 
@@ -280,8 +309,6 @@ class DocumentController extends Controller
         return implode('.', $this->numbering);
     }
 
-
-
     private function paragraphHasText(array $node): bool
     {
         foreach ($node['children'] ?? [] as $leaf) {
@@ -294,12 +321,12 @@ class DocumentController extends Controller
 
     private function getIndentByLevel(int $level): array
     {
-        $base = 1.25 * 567; // 1.25 см
+        $base = 0 * 567; // 1.25 см
         $step = 1.25 * 567;
 
         return [
             'left'      => $base + ($level - 2) * $step,
-            // 'firstLine' => $step,
+            'firstLine' => $step,
         ];
     }
 
@@ -310,6 +337,95 @@ class DocumentController extends Controller
             'right' => 0.25 * 567, // 1 см
         ];
     }
+
+    private function renderCover(PhpWord $phpWord, Document $document): void
+    {
+        $cover = $document->cover ?? [];
+
+        $section = $phpWord->addSection([
+            'marginLeft'   => 3 * 567,
+            'marginRight'  => 1 * 567,
+            'marginTop'    => 2 * 567,
+            'marginBottom' => 2 * 567,
+        ]);
+
+        $center = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER];
+
+        $section->addText($cover['organization'] ?? '', [
+            'bold' => true,
+            'size' => 14,
+        ], $center);
+
+        $section->addTextBreak(1);
+
+        $section->addText($cover['system'] ?? '', [
+            'bold' => true,
+            'size' => 14,
+        ], $center);
+
+        $section->addTextBreak(2);
+
+        $section->addText($cover['document_type'] ?? '', [
+            'size' => 14,
+        ], $center);
+
+        $section->addTextBreak(1);
+
+        $section->addText($cover['document_name'] ?? '', [
+            'bold' => true,
+            'size' => 14,
+            'allCaps' => true,
+        ], $center);
+
+        $section->addTextBreak(1);
+
+        if (!empty($cover['iso'])) {
+            $section->addText($cover['iso'], ['size' => 12], $center);
+        }
+
+        $section->addTextBreak(2);
+
+        if (!empty($cover['code'])) {
+            $section->addText($cover['code'], ['size' => 12], $center);
+        }
+
+        $section->addTextBreak(8);
+
+        $section->addText(
+            ($cover['city'] ?? '') . ', ' . ($cover['year'] ?? ''),
+            ['size' => 12],
+            $center
+        );
+    }
+
+    private function addPageNumberFooter($section): void
+    {
+        $footer = $section->addFooter();
+
+        $footer->addPreserveText(
+            '{PAGE}',
+            [
+                'name' => 'Times New Roman',
+                'size' => 14,
+            ],
+            [
+                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
+            ]
+        );
+    }
+
+    // private function renderToc($section, Document $document): void
+    // {
+    //     $section->addTitle('Содержание', 1);
+
+    //     $section->addTextRun()->addText('Предисловие');
+
+    //     foreach ($document->chapters()->orderBy('position')->get() as $chapter) {
+    //         $section->addTextRun()->addText(
+    //             $chapter->position . ' ' . $chapter->title
+    //         );
+    //     }
+    // }
 
     // private function addMath($section, string $omml)
     // {
@@ -394,10 +510,15 @@ class DocumentController extends Controller
 
     public function update(Request $request, Document $document)
     {
-        $document->update([
-            'title' => $request->title,
-        ]);
+        $document->update(
+            $request->only(['title', 'cover', 'preface'])
+        );
 
         return response()->json();
     }
 }
+
+
+
+// composer show phpoffice/phpword
+// composer show phpoffice/math

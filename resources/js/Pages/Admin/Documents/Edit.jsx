@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
 
 import AdminLayout from "@/Layouts/AdminLayout";
 import SlateEditor from "@/Components/SlateEditor";
+import CoverEditor from "@/Components/CoverEditor";
+// import TocPreview from "@/Components/TocPreview";
 
 const MIN_LEVEL = 2;
 
@@ -142,7 +144,16 @@ export default function Edit({ document }) {
             prev.map((ch) => (ch.id === id ? { ...ch, ...normalizedData } : ch))
         );
     };
+    const [preface, setPreface] = useState(
+        document.preface || [{ type: "paragraph", children: [{ text: "" }] }]
+    );
+    const updatePreface = async (value) => {
+        setPreface(value);
 
+        await axios.put(`/admin/documents/${document.id}`, {
+            preface: value,
+        });
+    };
     const chaptersRef = useRef(chapters);
 
     // всегда держим ref актуальным
@@ -203,6 +214,21 @@ export default function Edit({ document }) {
             >
                 Скачать DOCX
             </button>
+
+            {/* 1. Титульный лист */}
+            <CoverEditor document={document} />
+
+            {/* 2. Предисловие */}
+            <div className="border p-4 bg-white rounded mb-6">
+                <h2 className="font-bold text-lg mb-2">Предисловие</h2>
+                <SlateEditor value={preface} onChange={updatePreface} />
+            </div>
+
+            {/* 3. Содержание */}
+            {/* <TocPreview chapters={chapters} /> */}
+
+            {/* 4. Основные главы */}
+            {/* <ChaptersEditor /> */}
 
             <div className="mb-4">
                 <button

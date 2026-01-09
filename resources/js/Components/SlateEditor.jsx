@@ -747,7 +747,7 @@ const InlineImageElement = ({
                 )}
             </span>
 
-            {active && (
+            {/* {active && (
                 <span className="absolute -top-6 left-1/2 -translate-x-1/2 flex gap-1">
                     <button
                         onMouseDown={(e) => {
@@ -768,7 +768,7 @@ const InlineImageElement = ({
                         ↻
                     </button>
                 </span>
-            )}
+            )} */}
         </span>
     );
 };

@@ -38,7 +38,7 @@ export default function AppLayout({ children }) {
                             </Link>
 
                             <Link
-                                href="/documents"
+                                href="/admin/documents"
                                 className="hover:text-gray-300 transition"
                             >
                                 Документы
