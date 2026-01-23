@@ -23,4 +23,14 @@ class Chapter extends Model
     {
         return $this->belongsTo(Document::class);
     }
+
+    public function checks()
+    {
+        return $this->hasMany(ChapterCheck::class);
+    }
+
+    public function lastCheck()
+    {
+        return $this->hasOne(ChapterCheck::class)->latest();
+    }
 }

@@ -16,6 +16,8 @@ return new class extends Migration
             $table->uuid('uuid')->unique();
             $table->string('title')->default('Новый документ');
             $table->json('json_code')->nullable();
+            $table->json('cover')->nullable();
+            $table->json('preface')->nullable();
             $table->timestamps();
         });
     }

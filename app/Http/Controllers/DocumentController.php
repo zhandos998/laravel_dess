@@ -517,8 +517,3 @@ class DocumentController extends Controller
         return response()->json();
     }
 }
-
-
-
-// composer show phpoffice/phpword
-// composer show phpoffice/math

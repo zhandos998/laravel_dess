@@ -19,8 +19,51 @@ export default function Edit({ document }) {
         (document.chapters || []).map((c) => ({
             ...c,
             open: Boolean(c.open),
+            checkStatus: "idle", // idle | checking | ok | error
+            checkResult: null,
         }))
     );
+    const checkChapter = async (chapterId) => {
+        setChapters((prev) =>
+            prev.map((ch) =>
+                ch.id === chapterId
+                    ? { ...ch, checkStatus: "checking", checkResult: null }
+                    : ch
+            )
+        );
+
+        try {
+            const res = await axios.post(`/admin/chapters/${chapterId}/check`);
+
+            setChapters((prev) =>
+                prev.map((ch) =>
+                    ch.id === chapterId
+                        ? {
+                              ...ch,
+                              checkStatus:
+                                  res.data.status === "ok" ? "ok" : "error",
+                              checkResult: res.data.result,
+                          }
+                        : ch
+                )
+            );
+        } catch (e) {
+            setChapters((prev) =>
+                prev.map((ch) =>
+                    ch.id === chapterId
+                        ? {
+                              ...ch,
+                              checkStatus: "error",
+                              checkResult: {
+                                  summary: "Ошибка запроса к серверу",
+                                  errors: [],
+                              },
+                          }
+                        : ch
+                )
+            );
+        }
+    };
 
     const downloadDocumentJson = () => {
         const data = {
@@ -266,7 +309,7 @@ export default function Edit({ document }) {
                                 />
 
                                 <div className="flex gap-2">
-                                    <button
+                                    {/* <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             downloadChapterJson(chapter);
@@ -274,6 +317,18 @@ export default function Edit({ document }) {
                                         className="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50"
                                     >
                                         JSON
+                                    </button> */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            checkChapter(chapter.id);
+                                        }}
+                                        disabled={
+                                            chapter.checkStatus === "checking"
+                                        }
+                                        className="text-sm px-2 py-1 border rounded bg-white hover:bg-gray-50"
+                                    >
+                                        Проверить
                                     </button>
 
                                     <span>{chapter.open ? "−" : "+"}</span>
@@ -306,6 +361,47 @@ export default function Edit({ document }) {
                                     />
                                 </div>
                             )}
+                            <div className="px-4 pb-3 text-sm">
+                                {chapter.checkStatus === "checking" && (
+                                    <span className="text-gray-500">
+                                        ⏳ Проверяется…
+                                    </span>
+                                )}
+
+                                {chapter.checkStatus === "ok" && (
+                                    <span className="text-green-600">
+                                        ✅ Всё хорошо
+                                    </span>
+                                )}
+
+                                {chapter.checkStatus === "error" && (
+                                    <span className="text-red-600">
+                                        ❌{" "}
+                                        {chapter.checkResult?.summary ||
+                                            "Найдены ошибки"}
+                                    </span>
+                                )}
+                            </div>
+                            {chapter.checkStatus === "error" &&
+                                chapter.checkResult?.errors?.length > 0 && (
+                                    <div className="mt-2 border rounded bg-red-50 p-3 text-sm">
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            {chapter.checkResult.errors.map(
+                                                (err, i) => (
+                                                    <li key={i}>
+                                                        <b>{err.type}:</b>{" "}
+                                                        {err.message}
+                                                        {err.fragment && (
+                                                            <div className="text-gray-600 italic">
+                                                                «{err.fragment}»
+                                                            </div>
+                                                        )}
+                                                    </li>
+                                                )
+                                            )}
+                                        </ul>
+                                    </div>
+                                )}
                         </div>
                     ))
                 )}

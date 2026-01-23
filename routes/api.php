@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ChapterCheckController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ChatController;
@@ -12,3 +13,6 @@ Route::get('/user', function (Request $request) {
 // Route::middleware('auth')->group(function () {
 //     Route::post('/chat/send', [ChatController::class, 'send']);
 // });
+
+
+Route::post('/admin/chapters/{chapter}/check', [ChapterCheckController::class, 'check']);

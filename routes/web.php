@@ -7,6 +7,7 @@ use App\Http\Controllers\DocumentController;
 // use App\Http\Controllers\DocController;
 use App\Http\Controllers\AiLogController;
 use App\Http\Controllers\ChapterController;
+use App\Http\Controllers\ChapterCheckController;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__ . '/auth.php';
@@ -41,6 +42,7 @@ Route::middleware('auth')->group(
 
         Route::post('/admin/documents/{document}/chapters', [ChapterController::class, 'store']);
         Route::put('/admin/chapters/{chapter}', [ChapterController::class, 'update']);
+        Route::post('/admin/chapters/{chapter}/check', [ChapterCheckController::class, 'check']);
 
         Route::get('/admin/documents/{document}/export-docx', [DocumentController::class, 'exportDocx']);
     }
