@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
             [
                 RoleSeeder::class,
                 UserSeeder::class,
-                // DocumentSeeder::class,
+                ChaptersSeeder::class,
             ]
         );
     }
