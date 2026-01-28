@@ -504,7 +504,9 @@ class DocumentController extends Controller
         $document = Document::where('uuid', $uuid)->firstOrFail();
 
         return inertia('Admin/Documents/Edit', [
-            'document' => $document->load('chapters'),
+            'document' => $document->load([
+                'chapters.lastCheck'
+            ]),
         ]);
     }
 

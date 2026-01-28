@@ -19,8 +19,9 @@ export default function Edit({ document }) {
         (document.chapters || []).map((c) => ({
             ...c,
             open: Boolean(c.open),
-            checkStatus: "idle", // idle | checking | ok | error
-            checkResult: null,
+
+            checkStatus: c.last_check ? c.last_check.status : "idle", // idle | checking | ok | error
+            checkResult: c.last_check ? c.last_check.result : null,
         }))
     );
     const checkChapter = async (chapterId) => {

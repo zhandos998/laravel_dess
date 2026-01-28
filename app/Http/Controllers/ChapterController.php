@@ -59,9 +59,6 @@ class ChapterController extends Controller
         return $result;
     }
 
-
-
-
     public function store(Request $request, Document $document)
     {
         $chapter = $document->chapters()->create([
